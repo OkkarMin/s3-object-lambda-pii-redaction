@@ -1,5 +1,5 @@
 import { faker } from "@faker-js/faker";
-import fs from "fs";
+import ObjectsToCsv from "objects-to-csv";
 
 const data: Array<object> = [];
 
@@ -15,6 +15,4 @@ for (let index = 0; index < 100; index++) {
   });
 }
 
-fs.writeFile("output.json", JSON.stringify(data), "utf-8", function (err) {
-  if (err) console.log(err);
-});
+new ObjectsToCsv(data).toDisk("output.csv");
