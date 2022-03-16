@@ -11,7 +11,7 @@ for (let index = 0; index < 100; index++) {
     department: faker.commerce.department(),
     email: faker.internet.email(),
     username: faker.internet.userName(),
-    password: faker.internet.password(),
+    phone: faker.phone.phoneNumber(),
   });
 }
 
