@@ -1,21 +1,11 @@
-from ast import JoinedStr
-from cgitb import text
 import json
-import re
 import boto3
 from pprint import pprint
 
 comprehend = boto3.client("comprehend")
 
-record = {
-    "name": "Dr. Christopher O'Reilly",
-    "age": "58",
-    "address": "33975 Christiansen Roads",
-    "department": "Computers",
-    "salary": "178114",
-    "username": "Eulah.Swift72",
-    "password": "rNQvzNEuc0gkUCI",
-}
+with open("output.json", "r") as json_file:
+    record_list = json.load(json_file)
 
 
 def _detect_and_mask_pii_data(record):
@@ -25,43 +15,43 @@ def _detect_and_mask_pii_data(record):
         LanguageCode="en",
     )
 
-    # mask using masking function
-    masked_password_record = _mask_password_in_record(record, response["Entities"])
-    masked_age_record = _mask_age_in_record(
-        masked_password_record, response["Entities"]
+    # get data PII removed
+    record_pii_removed = _remove_all_except_name_department_email(
+        record,
+        response["Entities"],
     )
 
-    return masked_age_record
+    return record_pii_removed
 
 
-def _mask_password_in_record(record, entities):
+def _remove_all_except_name_department_email(record, entities):
+    record_copy = record.copy()
+    record_text = json.dumps(record)
+    values_to_remove = []
+
     for entity in entities:
-        if entity["Type"] == "PASSWORD" and entity["Score"] >= 0.8:
+        if entity["Type"] not in ["NAME", "DEPARTMENT", "EMAIL"]:
             start_index = entity["BeginOffset"]
             end_index = entity["EndOffset"]
 
-            record_text = json.dumps(record)
-            text_to_mask = record_text[start_index:end_index]
-            masked_record_text = record_text.replace(
-                text_to_mask, "*" * len(text_to_mask)
-            )
+            value_to_remove = record_text[start_index:end_index]
+            values_to_remove.append(value_to_remove)
 
-    return json.loads(masked_record_text)
+    for value_to_remove in values_to_remove:
+        key = _get_key_given_value(record, value_to_remove)
+        try:
+            record_copy.pop(key)
+        except KeyError:
+            pass
 
-
-def _mask_age_in_record(record, entities):
-    for entity in entities:
-        if entity["Type"] == "AGE" and entity["Score"] >= 0.8:
-            start_index = entity["BeginOffset"]
-            end_index = entity["EndOffset"]
-
-            record_text = json.dumps(record)
-            text_to_mask = record_text[start_index:end_index]
-            masked_record_text = record_text.replace(
-                text_to_mask, "*" * len(text_to_mask)
-            )
-
-    return json.loads(masked_record_text)
+    return record_copy
 
 
-pprint(_detect_and_mask_pii_data(record))
+def _get_key_given_value(record, value_to_check):
+    for key, val in record.items():
+        if value_to_check in val:
+            return key
+
+
+for record in record_list:
+    pprint(_detect_and_mask_pii_data(record))

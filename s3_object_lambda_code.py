@@ -1,3 +1,4 @@
+import csv
 import boto3
 import urllib3
 import json
@@ -24,14 +25,26 @@ def lambda_handler(event, context):
     # 4 - Transform object (the show starts here)
     for record in as_list:
         if record["department"] == "Computers":
-            # record["password"] = _mask(record["password"])
-            result_list.append(_detect_and_mask_pii_data(record))
+            # removing PII data from record
+            # record.pop("age")
+            # record.pop("address")
+            # record.pop("username")
+            # record.pop("phone")
+
+            # removing PII data from record using Amazon Comprehend
+            result_list.append(_detect_and_remove_pii_data(record))
             # result_list.append(record)
+
+    keys = result_list[0].keys()
+    with open("/tmp/result.csv", mode="w", newline="") as result_file:
+        dict_writer = csv.DictWriter(result_file, keys)
+        dict_writer.writeheader()
+        dict_writer.writerows(result_list)
 
     # 5 - Write object back to S3 Object Lambda
     s3 = boto3.client("s3")
     s3.write_get_object_response(
-        Body=json.dumps(result_list),
+        Body=open("/tmp/result.csv", "rb"),
         RequestRoute=request_route,
         RequestToken=request_token,
     )
@@ -39,7 +52,7 @@ def lambda_handler(event, context):
     return {"status_code": 200}
 
 
-def _detect_and_mask_pii_data(record):
+def _detect_and_remove_pii_data(record):
     # detect using comprehend
     comprehend = boto3.client("comprehend")
     response = comprehend.detect_pii_entities(
@@ -47,41 +60,38 @@ def _detect_and_mask_pii_data(record):
         LanguageCode="en",
     )
 
-    # mask record using masking function
-    masked_password_record = _mask_password_in_record(record, response["Entities"])
-    masked_age_record = _mask_age_in_record(
-        masked_password_record, response["Entities"]
+    # remove PII data from record
+    record_pii_removed = _remove_all_except_name_department_email(
+        record, response["Entities"]
     )
 
-    return masked_age_record
+    return record_pii_removed
 
 
-def _mask_password_in_record(record, entities):
+def _remove_all_except_name_department_email(record, entities):
+    record_copy = record.copy()
+    record_text = json.dumps(record)
+    values_to_remove = []
+
     for entity in entities:
-        if entity["Type"] == "PASSWORD" and entity["Score"] >= 0.8:
+        if entity["Type"] not in ["NAME", "DEPARTMENT", "EMAIL"]:
             start_index = entity["BeginOffset"]
             end_index = entity["EndOffset"]
 
-            record_text = json.dumps(record)
-            text_to_mask = record_text[start_index:end_index]
+            value_to_remove = record_text[start_index:end_index]
+            values_to_remove.append(value_to_remove)
 
-            masked_record_text = record_text.replace(
-                text_to_mask, "*" * len(text_to_mask)
-            )
+    for value_to_remove in values_to_remove:
+        key = _get_key_given_value(record, value_to_remove)
+        try:
+            record_copy.pop(key)
+        except KeyError:
+            pass
 
-    return json.loads(masked_record_text)
+    return record_copy
 
 
-def _mask_age_in_record(record, entities):
-    for entity in entities:
-        if entity["Type"] == "AGE" and entity["Score"] >= 0.8:
-            start_index = entity["BeginOffset"]
-            end_index = entity["EndOffset"]
-
-            record_text = json.dumps(record)
-            text_to_mask = record_text[start_index:end_index]
-            masked_record_text = record_text.replace(
-                text_to_mask, "*" * len(text_to_mask)
-            )
-
-    return json.loads(masked_record_text)
+def _get_key_given_value(record, value_to_check):
+    for key, val in record.items():
+        if value_to_check in val:
+            return key
