@@ -2,6 +2,7 @@ import json
 import boto3
 from pprint import pprint
 
+
 comprehend = boto3.client("comprehend")
 
 with open("output.json", "r") as json_file:
@@ -55,3 +56,15 @@ def _get_key_given_value(record, value_to_check):
 
 for record in record_list:
     pprint(_detect_and_mask_pii_data(record))
+
+s3 = boto3.client("s3")
+
+original_data = s3.get_object(Bucket="original-bucket", Key="original.json")
+original_json = original_data["Body"].read().decode("utf-8")
+
+
+redacted_data = s3.get_object(
+    Bucket="arn:aws:s3-object-lambda:REGION:ACCOUNT:accesspoint/OLAPNAME",
+    Key="redacted.json",
+)
+redacted_csv = redacted_data["Body"].read().decode("utf-8")

@@ -25,15 +25,15 @@ def lambda_handler(event, context):
     # 4 - Transform object (the show starts here)
     for record in as_dict:
         if record["department"] == "Computers":
-            # removing PII data from record
+            ## removing PII data from record
             # record.pop("age")
             # record.pop("address")
             # record.pop("username")
             # record.pop("phone")
-
-            # removing PII data from record using Amazon Comprehend
-            result_list.append(_detect_and_remove_pii_data(record))
             # result_list.append(record)
+
+            ## removing PII data from record using Amazon Comprehend
+            result_list.append(_detect_and_remove_pii_data(record))
 
     keys = result_list[0].keys()
     with open("/tmp/result.csv", mode="w", newline="") as result_file:
