@@ -19,11 +19,11 @@ def lambda_handler(event, context):
     response = http.request("GET", s3_url)
 
     original_object = response.data.decode("utf-8")
-    as_list = json.loads(original_object)
+    as_dict = json.loads(original_object)
     result_list = []
 
     # 4 - Transform object (the show starts here)
-    for record in as_list:
+    for record in as_dict:
         if record["department"] == "Computers":
             # removing PII data from record
             # record.pop("age")
